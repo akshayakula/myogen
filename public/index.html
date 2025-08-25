@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Robotic Hand Controller</title>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.17.0/dist/tf.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/handpose@0.0.3/dist/handpose.js"></script>
+    <script src="/socket.io/socket.io.js"></script>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🤖 Robotic Hand Controller</h1>
+            <div class="status-bar">
+                <div class="status-item" id="arduino-status">
+                    <span class="status-dot"></span>
+                    <span class="status-text">Arduino: Disconnected</span>
+                </div>
+                <div class="status-item" id="model-status">
+                    <span class="status-dot"></span>
+                    <span class="status-text">Model: Loading...</span>
+                </div>
+            </div>
+        </header>
+
+        <main>
+            <div class="video-container">
+                <video id="video" autoplay muted playsinline></video>
+                <canvas id="canvas" width="640" height="480"></canvas>
+                <div class="controls">
+                    <button id="start-btn" class="btn btn-primary">Start Tracking</button>
+                    <button id="stop-btn" class="btn btn-secondary" disabled>Stop Tracking</button>
+                    <button id="calibrate-btn" class="btn btn-warning">Calibrate</button>
+                </div>
+            </div>
+
+            <div class="info-panel">
+                <div class="panel">
+                    <h3>Finger Extensions</h3>
+                    <div class="finger-bars">
+                        <div class="finger-bar">
+                            <label>Thumb</label>
+                            <div class="bar-container">
+                                <div class="bar" id="thumb-bar"></div>
+                                <span class="value" id="thumb-value">0%</span>
+                            </div>
+                        </div>
+                        <div class="finger-bar">
+                            <label>Index</label>
+                            <div class="bar-container">
+                                <div class="bar" id="index-bar"></div>
+                                <span class="value" id="index-value">0%</span>
+                            </div>
+                        </div>
+                        <div class="finger-bar">
+                            <label>Middle</label>
+                            <div class="bar-container">
+                                <div class="bar" id="middle-bar"></div>
+                                <span class="value" id="middle-value">0%</span>
+                            </div>
+                        </div>
+                        <div class="finger-bar">
+                            <label>Ring</label>
+                            <div class="bar-container">
+                                <div class="bar" id="ring-bar"></div>
+                                <span class="value" id="ring-value">0%</span>
+                            </div>
+                        </div>
+                        <div class="finger-bar">
+                            <label>Pinky</label>
+                            <div class="bar-container">
+                                <div class="bar" id="pinky-bar"></div>
+                                <span class="value" id="pinky-value">0%</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="panel">
+                    <h3>Servo Angles</h3>
+                    <div class="servo-display">
+                        <div class="servo-item">
+                            <label>Servo 0 (Thumb)</label>
+                            <span id="servo-0">90°</span>
+                        </div>
+                        <div class="servo-item">
+                            <label>Servo 1 (Index)</label>
+                            <span id="servo-1">90°</span>
+                        </div>
+                        <div class="servo-item">
+                            <label>Servo 2 (Middle)</label>
+                            <span id="servo-2">90°</span>
+                        </div>
+                        <div class="servo-item">
+                            <label>Servo 3 (Ring)</label>
+                            <span id="servo-3">90°</span>
+                        </div>
+                        <div class="servo-item">
+                            <label>Servo 4 (Pinky)</label>
+                            <span id="servo-4">90°</span>
+                        </div>
+                        <div class="servo-item">
+                            <label>Servo 5 (Wrist)</label>
+                            <span id="servo-5">90°</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="panel">
+                    <h3>Manual Control</h3>
+                    <div class="manual-controls">
+                        <div class="servo-slider">
+                            <label>Servo 0: <span id="slider-0-value">90</span>°</label>
+                            <input type="range" id="slider-0" min="0" max="180" value="90">
+                        </div>
+                        <div class="servo-slider">
+                            <label>Servo 1: <span id="slider-1-value">90</span>°</label>
+                            <input type="range" id="slider-1" min="0" max="180" value="90">
+                        </div>
+                        <div class="servo-slider">
+                            <label>Servo 2: <span id="slider-2-value">90</span>°</label>
+                            <input type="range" id="slider-2" min="0" max="180" value="90">
+                        </div>
+                        <div class="servo-slider">
+                            <label>Servo 3: <span id="slider-3-value">90</span>°</label>
+                            <input type="range" id="slider-3" min="0" max="180" value="90">
+                        </div>
+                        <div class="servo-slider">
+                            <label>Servo 4: <span id="slider-4-value">90</span>°</label>
+                            <input type="range" id="slider-4" min="0" max="180" value="90">
+                        </div>
+                        <div class="servo-slider">
+                            <label>Servo 5: <span id="slider-5-value">90</span>°</label>
+                            <input type="range" id="slider-5" min="0" max="180" value="90">
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
