@@ -46,15 +46,15 @@ class RoboticHandController:
     FUNC_SET_RGB = 0x03
     FUNC_READ_ANGLE = 0x11
     
-    # Predefined hand positions
+    # Predefined hand positions (respecting Arduino limits and servo inversion)
     POSITIONS = {
-        'neutral': HandPosition(90, 90, 90, 90, 90, 90),
-        'open': HandPosition(90, 0, 0, 0, 0, 0),
-        'closed': HandPosition(90, 180, 180, 180, 180, 180),
-        'thumbs_up': HandPosition(90, 180, 0, 0, 0, 0),
-        'peace': HandPosition(90, 0, 180, 0, 180, 0),
-        'point': HandPosition(90, 0, 180, 180, 180, 180),
-        'grasp': HandPosition(90, 45, 90, 90, 90, 90),
+        'neutral': HandPosition(90, 90, 90, 90, 90, 90),     # All neutral (thumb will be inverted to 90°)
+        'open': HandPosition(90, 0, 0, 25, 0, 90),           # Fingers open, ring min is 25°
+        'closed': HandPosition(90, 160, 160, 160, 160, 90),  # Fingers mostly closed
+        'thumbs_up': HandPosition(0, 160, 0, 25, 0, 90),     # Thumb up (will invert to 180°)
+        'peace': HandPosition(90, 0, 160, 25, 160, 90),      # Index/middle open, others closed
+        'point': HandPosition(90, 0, 160, 160, 160, 90),     # Only index open
+        'grasp': HandPosition(90, 120, 120, 120, 120, 90),   # Moderate grasp
     }
     
     def __init__(self, port: str = None, baud_rate: int = 9600):
@@ -80,7 +80,14 @@ class RoboticHandController:
                 # Try to auto-detect port
                 import serial.tools.list_ports
                 ports = serial.tools.list_ports.comports()
-                arduino_ports = [p.device for p in ports if 'Arduino' in p.description or 'CH340' in p.description]
+                # Look for Arduino, CH340, USB, or usbmodem devices
+                arduino_ports = [p.device for p in ports if 
+                               'Arduino' in p.description or 
+                               'CH340' in p.description or 
+                               'USB' in p.description or
+                               'IOUSBHostDevice' in p.description or
+                               'usbmodem' in p.device or
+                               'usbserial' in p.device]
                 
                 if arduino_ports:
                     self.port = arduino_ports[0]
@@ -168,19 +175,28 @@ class RoboticHandController:
             print("Error: Must provide exactly 6 servo angles")
             return False
         
-        # Validate angles
+        # Validate angles - must match Arduino's limt_angles[6][2]
         limits = [(0, 82), (0, 180), (0, 180), (25, 180), (0, 180), (0, 180)]
         for i, (angle, (min_angle, max_angle)) in enumerate(zip(angles, limits)):
             if angle < min_angle or angle > max_angle:
                 print(f"Warning: Servo {i+1} angle {angle}° outside limits ({min_angle}-{max_angle}°)")
         
+        # Apply servo inversion logic to match Arduino code
+        # servos[i].write(i == 0 || i == 5 ? 180 - servo_angles[i] : servo_angles[i]);
+        adjusted_angles = []
+        for i, angle in enumerate(angles):
+            if i == 0 or i == 5:  # Thumb (servo 0) and wrist (servo 5) are inverted
+                adjusted_angles.append(180 - angle)
+            else:  # Servos 1-4 (fingers) are normal
+                adjusted_angles.append(angle)
+        
         # Convert to bytes
-        data = struct.pack('6B', *angles)
+        data = struct.pack('6B', *adjusted_angles)
         
         success = self._send_packet(self.FUNC_SET_SERVO, data)
         if success:
             self.current_position = HandPosition.from_array(angles)
-            print(f"Set servo angles: {angles}")
+            print(f"Set servo angles: {angles} (adjusted: {adjusted_angles})")
         
         return success
     
