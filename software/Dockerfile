@@ -19,7 +19,8 @@ RUN pip install --no-cache-dir --upgrade pip \
     transformers==4.43.3 \
     accelerate==0.34.2 \
     sentencepiece==0.2.0 \
-    safetensors==0.4.4
+    safetensors==0.4.4 \
+    hf_transfer==0.1.6
 
 # Copy handler
 COPY handler.py /handler.py
