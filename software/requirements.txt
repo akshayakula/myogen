@@ -1,0 +1,16 @@
+torch>=2.0.0
+transformers>=4.55.0
+accelerate>=0.20.0
+bitsandbytes>=0.41.0
+datasets>=2.14.0
+peft>=0.17.0
+trl>=0.20.0
+huggingface_hub>=0.16.0
+safetensors>=0.3.0
+fastapi>=0.104.0
+uvicorn>=0.24.0
+pydantic>=2.0.0
+requests>=2.31.0
+ultralytics>=8.0.0
+opencv-python>=4.8.0
+numpy>=1.21.0

@@ -19,6 +19,7 @@ const static uint8_t buzzerPin = 11;
 // RGB LED pin
 const static uint8_t rgbPin = 13;
 
+
 // RGB LED color object
 static CRGB rgbs[1];
 
@@ -30,6 +31,7 @@ static uint8_t servo_angles[6] = { 90, 90, 90, 90, 90, 90 };  /* Actual servo co
 static uint16_t tune_num = 0;
 static uint32_t tune_beat = 10;
 static uint16_t *tune;
+
 
 // Create servo control objects
 Servo servos[6];
@@ -48,8 +50,11 @@ void play_tune(uint16_t *p, uint32_t beat, uint16_t len);
 void tune_task(void);
 // Bluetooth control task
 void blue_task(void);
-// Thumb range test function
+// Servo range test functions
 void thumb_range_test(void);
+void all_servos_range_test(void);
+void synchronized_servo_test(void);
+void individual_servo_test(int servo_index, const char* servo_name, int min_angle, int max_angle);
 
 void setup() {
   // Initialize serial port and set baud rate
@@ -77,13 +82,14 @@ void setup() {
   delay(100);
   // Stop buzzer
   noTone(buzzerPin); //Configure TOUCH as input (input state is generally to read the state of this pin, i.e., read sensor feedback value)
+  
   // Print
   Serial.println("start");
   
-  // Run thumb range test on startup
-  Serial.println("Running thumb range test...");
-  thumb_range_test();
-  Serial.println("Thumb test complete - ready for normal operation");
+  // Run synchronized servo range test on startup
+  Serial.println("Running synchronized servo range test...");
+  synchronized_servo_test();
+  Serial.println("All servo tests complete - ready for normal operation");
 }
 
 void loop() {
@@ -177,24 +183,105 @@ void play_tune(uint16_t *p, uint32_t beat, uint16_t len) {
   tune_num = len;
 }
 
-// Thumb range test function - cycles thumb through full range of motion
-void thumb_range_test(void) {
-  Serial.println("  Testing thumb servo (index 0)...");
+// Comprehensive servo range test - tests all servos through their full range
+void all_servos_range_test(void) {
+  Serial.println("🤖 COMPREHENSIVE SERVO RANGE TEST");
+  Serial.println("==================================");
+  Serial.println("Testing all 6 servos through their full range of motion...");
+  Serial.println();
   
-  // Test positions: fully open (0°) -> fully closed (180°) -> back to center (90°)
-  int test_positions[] = {0, 45, 90, 135, 180, 135, 90, 45, 0, 90};
-  int num_positions = sizeof(test_positions) / sizeof(test_positions[0]);
+  // Servo configurations: {index, name, min_angle, max_angle}
+  struct ServoConfig {
+    int index;
+    const char* name;
+    int min_angle;
+    int max_angle;
+  };
+  
+  ServoConfig servo_configs[6] = {
+    {0, "Thumb", 0, 180},      // Servo 0: Thumb (inverted)
+    {1, "Index", 0, 180},      // Servo 1: Index finger
+    {2, "Middle", 0, 180},     // Servo 2: Middle finger
+    {3, "Ring", 25, 180},      // Servo 3: Ring finger (limited min)
+    {4, "Pinky", 0, 180},      // Servo 4: Pinky finger
+    {5, "Wrist", 0, 180}       // Servo 5: Wrist rotation (inverted)
+  };
+  
+  // Test each servo individually
+  for (int i = 0; i < 6; i++) {
+    Serial.print("🔧 Testing Servo ");
+    Serial.print(i);
+    Serial.print(" (");
+    Serial.print(servo_configs[i].name);
+    Serial.println("):");
+    
+    individual_servo_test(servo_configs[i].index, 
+                         servo_configs[i].name,
+                         servo_configs[i].min_angle, 
+                         servo_configs[i].max_angle);
+    
+    Serial.println();
+    delay(1000); // Pause between servos
+  }
+  
+  // Final synchronized movement - all to neutral
+  Serial.println("🎯 FINAL TEST: Moving all servos to neutral position...");
+  for (int i = 0; i < 6; i++) {
+    // Apply inversion logic for thumb (0) and wrist (5)
+    int target_angle = 90;
+    int actual_angle = (i == 0 || i == 5) ? 180 - target_angle : target_angle;
+    servos[i].write(actual_angle);
+    
+    Serial.print("  Servo ");
+    Serial.print(i);
+    Serial.print(" (");
+    Serial.print(servo_configs[i].name);
+    Serial.print("): ");
+    Serial.print(target_angle);
+    Serial.print("° -> ");
+    Serial.print(actual_angle);
+    Serial.println("°");
+  }
+  
+  Serial.println("✅ All servos at neutral position (90°)");
+  Serial.println("==================================");
+}
+
+// Individual servo test function
+void individual_servo_test(int servo_index, const char* servo_name, int min_angle, int max_angle) {
+  // Create test sequence: min -> 25% -> 50% -> 75% -> max -> 75% -> 50% -> 25% -> min -> neutral
+  int test_positions[10];
+  int range = max_angle - min_angle;
+  
+  test_positions[0] = min_angle;                    // Minimum
+  test_positions[1] = min_angle + (range * 25 / 100); // 25%
+  test_positions[2] = min_angle + (range * 50 / 100); // 50%
+  test_positions[3] = min_angle + (range * 75 / 100); // 75%
+  test_positions[4] = max_angle;                    // Maximum
+  test_positions[5] = min_angle + (range * 75 / 100); // 75% (return)
+  test_positions[6] = min_angle + (range * 50 / 100); // 50% (return)
+  test_positions[7] = min_angle + (range * 25 / 100); // 25% (return)
+  test_positions[8] = min_angle;                    // Minimum (return)
+  test_positions[9] = 90;                           // Neutral
+  
+  int num_positions = 10;
   
   for (int i = 0; i < num_positions; i++) {
     int target_angle = test_positions[i];
     
-    // Apply thumb inversion logic (same as in servo_control function)
-    int actual_angle = 180 - target_angle;
+    // Apply inversion logic for thumb (0) and wrist (5)
+    int actual_angle;
+    if (servo_index == 0 || servo_index == 5) {
+      actual_angle = 180 - target_angle; // Inverted servos
+    } else {
+      actual_angle = target_angle; // Normal servos
+    }
     
-    // Move thumb servo directly
-    servos[0].write(actual_angle);
+    // Move servo
+    servos[servo_index].write(actual_angle);
     
-    Serial.print("    Position ");
+    // Print status
+    Serial.print("    Step ");
     Serial.print(i + 1);
     Serial.print("/");
     Serial.print(num_positions);
@@ -202,14 +289,114 @@ void thumb_range_test(void) {
     Serial.print(target_angle);
     Serial.print("° -> Actual=");
     Serial.print(actual_angle);
-    Serial.println("°");
+    Serial.print("°");
+    
+    // Add description for key positions
+    if (i == 0) Serial.print(" (MIN)");
+    else if (i == 4) Serial.print(" (MAX)");
+    else if (i == 9) Serial.print(" (NEUTRAL)");
+    
+    Serial.println();
     
     // Wait for movement to complete
-    delay(800);
+    delay(700);
   }
   
-  // Return to neutral position (90°)
-  servos[0].write(90);
-  Serial.println("  Thumb returned to neutral position (90°)");
+  Serial.print("  ✅ ");
+  Serial.print(servo_name);
+  Serial.println(" test complete");
 }
+
+// Simple finger range test - all 5 fingers move through full range once
+void synchronized_servo_test(void) {
+  Serial.println("🤖 SIMPLE FINGER RANGE TEST");
+  Serial.println("============================");
+  Serial.println("All 5 fingers will move from open to closed and back to neutral!");
+  Serial.println();
+  
+  // Finger configurations (excluding wrist)
+  struct FingerConfig {
+    int index;
+    const char* name;
+    int min_angle;
+    int max_angle;
+  };
+  
+  FingerConfig finger_configs[5] = {
+    {0, "Thumb", 0, 180},      // Servo 0: Thumb (inverted)
+    {1, "Index", 0, 180},      // Servo 1: Index finger
+    {2, "Middle", 0, 180},     // Servo 2: Middle finger
+    {3, "Ring", 25, 180},      // Servo 3: Ring finger (limited min)
+    {4, "Pinky", 0, 180}       // Servo 4: Pinky finger
+  };
+  
+  // Keep wrist at neutral (90°) throughout test
+  servos[5].write(90);
+  Serial.println("🔧 Wrist set to neutral position (90°)");
+  Serial.println();
+  
+  // Test sequence: 3 simple positions
+  const char* step_names[3] = {
+    "OPEN HAND (All fingers extended)",
+    "CLOSED FIST (All fingers closed)", 
+    "NEUTRAL POSITION (All fingers at 90°)"
+  };
+  
+  for (int step = 0; step < 3; step++) {
+    Serial.print("🎯 Step ");
+    Serial.print(step + 1);
+    Serial.print("/3: ");
+    Serial.println(step_names[step]);
+    
+    // Move all 5 fingers to target position
+    for (int i = 0; i < 5; i++) {
+      int target_angle;
+      
+      switch(step) {
+        case 0: target_angle = finger_configs[i].min_angle; break;  // Open (min angles)
+        case 1: target_angle = finger_configs[i].max_angle; break;  // Closed (max angles)
+        case 2: target_angle = 90; break;                           // Neutral
+      }
+      
+      // Apply inversion logic for thumb (0) only
+      int actual_angle;
+      if (i == 0) {
+        actual_angle = 180 - target_angle; // Inverted thumb
+      } else {
+        actual_angle = target_angle; // Normal fingers
+      }
+      
+      // Move finger
+      servos[i].write(actual_angle);
+      
+      // Print finger status
+      Serial.print("  ");
+      Serial.print(finger_configs[i].name);
+      Serial.print(": ");
+      Serial.print(target_angle);
+      Serial.print("° -> ");
+      Serial.print(actual_angle);
+      Serial.print("°");
+      if (i < 4) Serial.print(", ");
+    }
+    Serial.println();
+    Serial.println();
+    
+    // Wait for all fingers to reach position
+    delay(2000); // 2 second delay to see the movement clearly
+  }
+  
+  // Final status
+  Serial.println("🎉 FINGER TEST COMPLETE!");
+  Serial.println("All fingers demonstrated full range of motion.");
+  Serial.println("Hand is now in neutral position and ready for use.");
+  Serial.println("============================");
+}
+
+// Legacy thumb test function (kept for compatibility)
+void thumb_range_test(void) {
+  Serial.println("🔧 Legacy thumb test (use synchronized_servo_test() for comprehensive testing)");
+  individual_servo_test(0, "Thumb", 0, 180);
+}
+
 

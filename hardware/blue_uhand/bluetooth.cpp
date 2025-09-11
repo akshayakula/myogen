@@ -6,11 +6,13 @@ blue_controller::blue_controller()
   success = 0;
 }
 
+
 bool blue_controller::get_servos(struct uHand_Servo* uhand_servos)
 {
   if(success == 0)
     return false;
   success = 0;
+  
   if(resule_oj.func == CMD_SERVO_MOVE)
   {
     uhand_servos->num = resule_oj.buf[0];
@@ -22,7 +24,8 @@ bool blue_controller::get_servos(struct uHand_Servo* uhand_servos)
       uhand_servos->servos[i].Position = (resule_oj.buf[i*3+5]<<8 & 0xff00) + resule_oj.buf[i*3+4];
     }
     return true;
-  }else{
+  }
+  else{
     Serial.print("func:");
     Serial.println(resule_oj.func);
     return false;
