@@ -194,3 +194,58 @@ python yolo_webcam.py --confidence 0.7
 - The script automatically handles device selection (CPU/MPS)
 - All models use efficient quantization when possible
 - Memory usage is optimized for Mac systems
+
+## ☁️ Run `server.py` on RunPod Pod (no Dockerfile)
+
+Run the FastAPI server directly inside a RunPod GPU Pod and expose it over HTTP.
+
+### 1) Start a GPU Pod
+- GPU: A100 80GB or H100 80GB (1 GPU recommended for 20B). Smaller (24–40 GB) may OOM.
+- Disk: 80 GB.
+- Network: Expose HTTP port 8000 in the pod settings.
+
+### 2) Prepare environment in the Pod
+```bash
+# In the Pod terminal
+git clone <your-repo-url>
+cd myogen/software
+
+pip install --upgrade pip
+# Keep Pod's CUDA torch; install the rest of the deps
+pip install -r <(grep -v '^torch' requirements.txt)
+
+# Avoid HF transfer/Xet 403s unless configured
+export HF_HUB_ENABLE_HF_TRANSFER=0
+
+# If the model is private/gated
+# export HF_TOKEN=hf_xxx
+
+# Optional: override model repo
+export REPO_ID=myogen/myogen-gpt-oss-20b
+```
+
+### 3) Run the API server
+```bash
+uvicorn server:app --host 0.0.0.0 --port 8000 --workers 1
+```
+
+### 4) Test from your machine
+```bash
+curl -sS -X POST "https://<your-pod-id>-8000.proxy.runpod.net/generate" \
+  -H "Content-Type: application/json" \
+  --data-binary @- << 'JSON'
+{
+  "prompt": "Scene: A single everyday object is visible.\nObject identity: 010_potted_meat_can.\nObject size: small. Object position: arm's-length, centered, below relative to the camera. Object orientation: strongly rotated around the x-axis.\nTask: Output only the finger curls in this exact format:\npinky: <no curl|half curl|full curl>; ring: <no curl|half curl|full curl>; middle: <no curl|half curl|full curl>; index: <no curl|half curl|full curl>; thumb: <no curl|half curl|full curl>\nDo not add any extra words.",
+  "max_new_tokens": 32,
+  "temperature": 1.1,
+  "top_p": 0.95,
+  "do_sample": true,
+  "stop": ["\n"]
+}
+JSON
+```
+
+Notes:
+- Keep `--workers 1` to reduce memory pressure.
+- If downloads fail with 403s, ensure `HF_HUB_ENABLE_HF_TRANSFER=0`. If the model is private, set `HF_TOKEN`.
+- For faster cold starts, mount a volume at `/root/.cache/huggingface` to reuse model cache.
